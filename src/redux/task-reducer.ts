@@ -11,6 +11,7 @@ export type TaskType = {
     deadline: string
     tab: number
     order: number
+    confirmed: boolean
 }
 
 let initialState = {
@@ -71,18 +72,18 @@ export const requestTasks = (): ThunkType => {
 export const editTask = (task:TaskType): ThunkType => {
     return async (dispatch: Dispatch<ActionsType>) => {
         let data = await tasksAPI.putTask(task)
-        dispatch(actions.addTask(data))
+        dispatch(actions.setTask(data))
     }
 }
 
 export const addTask = (task:TaskType): ThunkType => {
     return async (dispatch: Dispatch<ActionsType>) => {
         let data = await tasksAPI.postTask(task)
-        dispatch(actions.setTask(data))
+        dispatch(actions.addTask(data))
     }
 }
 
-export default taskReducer;
+export default taskReducer
 
 export type InitialStateType = typeof initialState
 type ActionsType = InferActionsTypes<typeof actions>

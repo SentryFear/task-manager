@@ -11,6 +11,12 @@ type ActiveProps = {
     active?: boolean
 }
 
+type TaskProps = {
+    active?: boolean
+    yellow?: boolean
+    red?: boolean
+}
+
 const Container = styled.div<ActiveProps>`
     display: grid;
     grid-template-areas: 
@@ -95,17 +101,31 @@ interface RouteParams {
 const Tasks = styled.div`
     
 `
-const Task = styled.div<ActiveProps>`
+const Task = styled.div<TaskProps>`
         display: grid;
         grid-template-areas: 
-        "name date";
-        background-color: ${(props) => props.active ? "#3b4055" : "#2f3243"};
-        grid-template-columns: 1fr 1fr;
+        "name date conf";
+        ${(props) => props.active 
+            ?
+                props.red ? "background-color: #7b2626;" : props.yellow ? "background-color: #307976;" : "background-color: #3b4055;" 
+            :
+                props.red ? "background-color: #7d0808;" : props.yellow ? "background-color: #066b66;" : "background-color: #2f3243;"
+        };
+        
+    //props.active ? "#3b4055" : "#2f3243"};
+    //props.yellow ? "red" : "green"};
+    //props.active ? "#3b4055" : "#2f3243" || 
+        grid-template-columns: 5fr 5fr 1fr;
         align-items: start;
         margin: 10px;
         border: solid 2px #1c2230;
         border-radius: 10px;
         padding: 20px;
+        &.confirmed {
+            text-decoration: line-through;
+            color: #4d5169;
+            background-color: ${(props) => props.active ? "#344055" : "#242c3a"};
+        }
         &.dropArea {
            color: black !important;
            background: white !important;
@@ -181,6 +201,20 @@ const SaveButton = styled.button`
     text-decoration: none;
 `
 
+const ConfirmButton = styled.button`
+    float: right;
+    background-color: #5049e0;
+    color: #c4c6cf;
+    display: inline;
+    padding: 7px 15px;
+    border: solid 1px #24255f;
+    border-radius: 5px;
+    font-size: 12px;
+    text-decoration: none;
+    display: grid;
+    grid-area: conf;
+`
+
 const EmptyP = styled.p`
     padding: 20px;
 `
@@ -207,60 +241,42 @@ const App: React.FC = () => {
     //const [dragOverTask, setDragOverTask] = useState()
 
     const initialDnDState = {
-        draggedFrom: null as number | null,
-        draggedTo: null as number | null,
-        isDragging: false as boolean,
-        originalOrder: [] as Array<TaskType>,
-        updatedOrder: [] as Array<TaskType>
+        draggedFrom: {} as TaskType,
+        draggedTo: {} as TaskType,
+        isDragging: false as boolean
     }
 
     const [dragAndDrop, setDragAndDrop] = useState(initialDnDState)
 
     const [form, setForm] = useState({} as TaskType)
 
-    const onDragStart = (event:any) => {
-
-        const initialPosition = Number(event.currentTarget.dataset.position);
+    const onDragStart = (event:any, item:TaskType) => {
 
         setDragAndDrop({
             ...dragAndDrop,
-            draggedFrom: initialPosition,
+            draggedFrom: item,
             isDragging: true,
-            originalOrder: tasks.tasks
         });
 
         // Note: this is only for Firefox.
         event.dataTransfer.setData("text/html", '');
     }
 
-    const onDragOver = (event:any) => {
-        // in order for the onDrop
-        // event to fire, we have
-        // to cancel out this one
+    const onDragOver = (event:any, item:TaskType) => {
+
         event.preventDefault();
 
-        let newList = dragAndDrop.originalOrder;
 
         // index of the item being dragged
         const draggedFrom = dragAndDrop.draggedFrom;
 
         if(draggedFrom !== null) {
 
-            const draggedTo = Number(event.currentTarget.dataset.position);
-
-            const itemDragged = newList[draggedFrom]
-            const remainingItems = newList.filter((item, index) => index !== draggedFrom);
-
-            newList = [
-                ...remainingItems.slice(0, draggedTo),
-                itemDragged,
-                ...remainingItems.slice(draggedTo)
-            ];
+            const draggedTo = item
 
             if (draggedTo !== dragAndDrop.draggedTo){
                 setDragAndDrop({
                     ...dragAndDrop,
-                    updatedOrder: newList,
                     draggedTo: draggedTo
                 })
             }
@@ -268,12 +284,16 @@ const App: React.FC = () => {
     }
 
     const onDrop = () => {
-        dispatch(actions.setTasks(dragAndDrop.updatedOrder))
+
+        dispatch(editTask({...dragAndDrop.draggedFrom, order: dragAndDrop.draggedTo.order}))
+
+        dispatch(editTask({...dragAndDrop.draggedTo, order: dragAndDrop.draggedFrom.order}))
+        //dispatch(actions.setTasks(dragAndDrop.updatedOrder))
 
         setDragAndDrop({
             ...dragAndDrop,
-            draggedFrom: null,
-            draggedTo: null,
+            draggedFrom: {} as TaskType,
+            draggedTo: {} as TaskType,
             isDragging: false
         });
     }
@@ -281,7 +301,7 @@ const App: React.FC = () => {
     const onDragLeave = () => {
         setDragAndDrop({
             ...dragAndDrop,
-            draggedTo: null
+            draggedTo: {} as TaskType
         });
     }
 
@@ -300,6 +320,10 @@ const App: React.FC = () => {
         await dispatch(addTask(form))
 
         await dispatch(requestTasks())
+    }
+
+    const confirmTask = (item:TaskType) => {
+        dispatch(editTask({...item, confirmed: true}))
     }
 
     const changeForm = (e:any) => {
@@ -330,21 +354,22 @@ const App: React.FC = () => {
                 <Tasks>
                     {tasks.tasks.length > 0 ? (
                         tasks.tasks
-                            //.sort((a, b) => a.order > b.order ? 1 : -1)
-                            .map((item,key) => (
+                            .sort((a, b) => a.order > b.order ? 1 : -1)
+                            .map((item) => (
                             Number(item.tab) === tab ?
                                 <Task key={item.id}
                                       active={task === item.id}
-                                      data-position={key}
+                                      yellow={new Date(item.deadline) <= new Date(new Date().getTime() + 3*24*60*60*1000)}
+                                      red={new Date(item.deadline) <= new Date()}
                                       onClick={() => {
                                           setTask(item.id)
                                           setEditMode(false)
                                       }}
                                       draggable="true"
-                                      onDragStart={onDragStart}
-                                      onDragOver={onDragOver}
+                                      onDragStart={(e) => onDragStart(e, item)}
+                                      onDragOver={(e) => onDragOver(e, item)}
                                       onDrop={onDrop}
-                                      className={dragAndDrop && dragAndDrop.draggedTo === Number(key) ? "dropArea" : ""}
+                                      className={dragAndDrop && dragAndDrop.draggedTo.id === item.id ? "dropArea" : "" || item.confirmed ? "confirmed" : ""}
                                       onDragLeave={onDragLeave}
                                 >
                                     <TaskName>
@@ -361,9 +386,10 @@ const App: React.FC = () => {
                                                 hour: "2-digit",
                                                 minute: "2-digit",
                                                 second: "2-digit"
-                                            }).format(new Date(item.deadline))}
+                                            }).format(item.deadline ? new Date(item.deadline) : new Date())}
                                         </div>
                                     </TaskDate>
+                                    {item.confirmed ? "" : <ConfirmButton onClick={() => confirmTask(item)}>Confirm</ConfirmButton>}
                                 </Task>
                                 : ''
                         ))
@@ -391,7 +417,7 @@ const App: React.FC = () => {
                                 <Label>Date</Label>
                                 <div>{editMode
                                     ? <DatePicker
-                                        selected={new Date(form.deadline)}
+                                        selected={form.deadline ? new Date(form.deadline) : new Date()}
                                         onChange={date => changeDate(date)}
                                         showTimeSelect
                                         timeFormat="HH:mm"
@@ -406,7 +432,7 @@ const App: React.FC = () => {
                                     hour: "2-digit",
                                     minute: "2-digit",
                                     second: "2-digit"
-                                }).format(new Date(item.deadline))}</div>
+                                }).format(item.deadline ? new Date(item.deadline) : new Date())}</div>
                             </SidebarDesc>
                             <SidebarDesc>
                                 <Label>Category</Label>
@@ -417,6 +443,7 @@ const App: React.FC = () => {
                                         <option value={3}>Tab 3</option>
                                 </select> : item.tab}</div>
                             </SidebarDesc>
+                            {item.confirmed ? <SidebarDesc><Label>Confirmed</Label></SidebarDesc> : ''}
                             {editMode ? <SaveButton type="submit">Save Task</SaveButton>: '' }
                         </form>
                     </Sidebar>
