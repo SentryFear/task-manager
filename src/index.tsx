@@ -5,21 +5,12 @@ import './index.css'
 import * as serviceWorker from './serviceWorker'
 import store from "./redux/store";
 import {Provider} from "react-redux";
-import {BrowserRouter, Route, Switch} from "react-router-dom";
+import {BrowserRouter} from "react-router-dom";
 
 ReactDOM.render(
     <BrowserRouter>
         <Provider store={store}>
-            <Switch>
-                <Route exact path='/'
-                       render={() => <App/>}/>
-
-                <Route path='/tab/:id'
-                       render={() => <App/>}/>
-
-                <Route path='*'
-                       render={() => <App/>}/>
-            </Switch>
+            <App/>
         </Provider>
     </BrowserRouter>,
     document.getElementById('root')
